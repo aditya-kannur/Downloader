@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <!-- tell Flask to serve styles.css from current folder -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        function toggleAudioOptions() {
+            const type = document.getElementById("type").value;
+            const audioOptions = document.getElementById("audioOptions");
+            if (type === "audio") {
+                audioOptions.style.display = "block";
+            } else {
+                audioOptions.style.display = "none";
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h2>Paste a YouTube Link</h2>
+        <form method="POST" action="/download">
+            <input type="text" name="url" placeholder="Enter video URL" required><br><br>
+
+            <label>Type:</label>
+            <select name="type" id="type" onchange="toggleAudioOptions()">
+                <option value="audio">Audio (MP3)</option>
+                <option value="video">Video (MP4)</option>
+            </select><br><br>
+
+            <label>Quality:</label>
+            <select name="quality">
+                <option value="144">144p</option>
+                <option value="240">240p</option>
+                <option value="360">360p</option>
+                <option value="480">480p</option>
+                <option value="720">720p HD</option>
+                <option value="1080">1080p Full HD</option>
+                <option value="best">Best Available</option>
+            </select><br><br>
+
+            <div id="audioOptions">
+                <label>Audio Bitrate:</label>
+                <select name="abitrate">
+                    <option value="64">64 kbps</option>
+                    <option value="128" selected>128 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="320">320 kbps</option>
+                </select><br><br>
+            </div>
+
+            <button type="submit">Download</button>
+        </form>
+    </div>
+
+    <script>
+        toggleAudioOptions();
+    </script>
+</body>
+</html>
