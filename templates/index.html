@@ -4,58 +4,123 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Downloader</title>
-    <!-- tell Flask to serve styles.css from current folder -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script>
-        function toggleAudioOptions() {
-            const type = document.getElementById("type").value;
-            const audioOptions = document.getElementById("audioOptions");
-            if (type === "audio") {
-                audioOptions.style.display = "block";
-            } else {
-                audioOptions.style.display = "none";
-            }
-        }
-    </script>
 </head>
 <body>
     <div class="container">
         <h2>Paste a YouTube Link</h2>
-        <form method="POST" action="/download">
+        
+        <form id="downloadForm">
             <input type="text" name="url" placeholder="Enter video URL" required><br><br>
-
+            
             <label>Type:</label>
             <select name="type" id="type" onchange="toggleAudioOptions()">
-                <option value="audio">Audio (MP3)</option>
                 <option value="video">Video (MP4)</option>
+                <option value="audio">Audio (MP3)</option>
             </select><br><br>
-
-            <label>Quality:</label>
-            <select name="quality">
-                <option value="144">144p</option>
-                <option value="240">240p</option>
-                <option value="360">360p</option>
-                <option value="480">480p</option>
-                <option value="720">720p HD</option>
-                <option value="1080">1080p Full HD</option>
-                <option value="best">Best Available</option>
-            </select><br><br>
-
-            <div id="audioOptions">
-                <label>Audio Bitrate:</label>
-                <select name="abitrate">
-                    <option value="64">64 kbps</option>
-                    <option value="128" selected>128 kbps</option>
-                    <option value="192">192 kbps</option>
-                    <option value="320">320 kbps</option>
+            
+            <div id="videoOptions">
+                <label>Quality:</label>
+                <select name="quality">
+                    <option value="best">Best Available</option>
+                    <option value="1080">1080p Full HD</option>
+                    <option value="720">720p HD</option>
+                    <option value="480">480p</option>
+                    <option value="360">360p</option>
                 </select><br><br>
             </div>
 
+            <div id="audioOptions" style="display:none;">
+                <label>Audio Bitrate:</label>
+                <select name="abitrate">
+                    <option value="320">320 kbps</option>
+                    <option value="192">192 kbps</option>
+                    <option value="128" selected>128 kbps</option>
+                    <option value="64">64 kbps</option>
+                </select><br><br>
+            </div>
+            
             <button type="submit">Download</button>
         </form>
+
+        <div id="progressSection" style="display:none;">
+            <h3 id="statusText">Starting...</h3>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div id="downloadLinkContainer"></div>
+        </div>
+
     </div>
 
     <script>
+        function toggleAudioOptions() {
+            const type = document.getElementById("type").value;
+            const audioOptions = document.getElementById("audioOptions");
+            const videoOptions = document.getElementById("videoOptions");
+            if (type === "audio") {
+                audioOptions.style.display = "block";
+                videoOptions.style.display = "none";
+            } else {
+                audioOptions.style.display = "none";
+                videoOptions.style.display = "block";
+            }
+        }
+        
+        document.getElementById('downloadForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const progressSection = document.getElementById('progressSection');
+            const downloadLinkContainer = document.getElementById('downloadLinkContainer');
+            const statusText = document.getElementById('statusText');
+            const progressBar = document.getElementById('progressBar');
+            
+            progressSection.style.display = 'block';
+            form.style.display = 'none';
+            downloadLinkContainer.innerHTML = '';
+            statusText.textContent = 'Submitting...';
+            progressBar.style.width = '0%';
+
+            const response = await fetch('/download', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            const jobId = data.job_id;
+
+            const eventSource = new EventSource(`/progress/${jobId}`);
+
+            eventSource.onmessage = function(event) {
+                const progressData = JSON.parse(event.data);
+                
+                if (progressData.status === 'downloading') {
+                    const percent = Math.floor(progressData.progress);
+                    const streamType = progressData.stream_type;
+                    statusText.textContent = `Downloading ${streamType}... ${percent}%`;
+                    progressBar.style.width = `${percent}%`;
+                } else if (progressData.status === 'processing') {
+                    statusText.textContent = 'Processing & Merging Files...';
+                } else if (progressData.status !== 'complete' && progressData.status !== 'error') {
+                    statusText.textContent = `${progressData.status}...`;
+                }
+
+                if (progressData.status === 'complete') {
+                    statusText.textContent = 'Download Complete!';
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = `/get-file/${jobId}`;
+                    downloadLink.textContent = `Click here to download: ${progressData.filename}`;
+                    downloadLink.className = 'download-button';
+                    downloadLinkContainer.appendChild(downloadLink);
+                    eventSource.close();
+                } else if (progressData.status === 'error') {
+                    statusText.textContent = `Error: ${progressData.error}`;
+                    eventSource.close();
+                }
+            };
+        });
+        
         toggleAudioOptions();
     </script>
 </body>
